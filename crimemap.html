@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="initial-scale=1.0, user-scalable=no" />
+<meta http-equiv="content-type" content="text/html; charset=UTF-8"/>
+<style type="text/css">
+  html { height: 100% }
+  body { height: 100%; margin: 0; padding: 0 }
+  #startDate {
+  	visibility: hidden;
+  }
+  #endDate {
+  	visibility: hidden;
+  }
+  #map_canvas {
+  	height: 50%;
+  	width: 50%;
+  }
+</style>
+<script type="text/javascript"
+    src="http://maps.googleapis.com/maps/api/js?sensor=false">
+</script>
+<script type="text/javascript">
+var map;
+var layers = new Array();
+var crimes = {"robbery" : false,
+              "homicide" : false,
+              "theft" : false,
+              "burglary" : false,
+              "arson" : false,
+              "sex" : false,
+              "auto" : false,
+              "tfa" : false,
+              "adw" : false,
+              "all" : false
+			};
+var tables = {"robbery" : '1618391',
+	        "homicide" : '1618584',
+    	    "theft" : '1618607',
+    	    "burglary" : '1618576',
+    	    "arson" : '1618574',
+    	    "sex" : '1618493',
+    	    "auto" : '1618589',
+    	    "tfa" : '1618712',
+    	    "adw" : '1618465',
+    	    "all" : '1617055'
+			};
+              
+function initialize() {
+
+    map = new google.maps.Map(document.getElementById('map_canvas'), {
+      center: new google.maps.LatLng(38.889931, -77.009096),
+      zoom: 11,
+      mapTypeId: google.maps.MapTypeId.ROADMAP
+    }); 
+    heatmap(1617055);
+}
+
+function removeOverlays() {
+	for (key in layers)
+	 layers[key].setMap(null);
+	layers = new Array();
+}
+  
+function heatmap(table) {
+	removeOverlays();
+	layer = new google.maps.FusionTablesLayer({
+		query: {
+		    select: 'LOCATION',
+		    from: table
+		},
+	      
+		  heatmap: {
+		        enabled: true
+		  }
+	    });
+	layers.push(layer);
+    layer.setMap(map);
+}
+
+function dotmap(table, startDate, endDate) {
+	
+	if (startDate != "" && endDate != "") {
+		layer = new google.maps.FusionTablesLayer({
+		  query: {
+		    select: 'LOCATION',
+		    from: table,
+			where: "DATE >= '" + startDate + "' AND DATE <= '" + endDate + "'"
+		  }
+		});
+	}
+	
+	else if (startDate != "") {
+		layer = new google.maps.FusionTablesLayer({
+			  query: {
+			    select: 'LOCATION',
+			    from: table,
+			    where: "DATE >= '" + startDate + "'"
+			  }
+			});
+	}
+
+	else if (endDate != "") {
+		layer = new google.maps.FusionTablesLayer({
+			  query: {
+			    select: 'LOCATION',
+			    from: table,
+			    where: "DATE <= '" + endDate + "'"
+			  }
+			});
+	}
+	
+	else {
+		layer = new google.maps.FusionTablesLayer({
+			  query: {
+			    select: 'LOCATION',
+			    from: table,
+			  }
+			});
+	}
+	
+	layers.push(layer);
+	layer.setMap(map);
+}
+
+function switchMode(mode) {
+	//reset selected layers
+	removeOverlays();
+	for (key in crimes) {
+		crimes[key] = false;
+	}
+	
+	//hide/show date elements
+	if (mode == 'heat') {
+		document.getElementById('startDate').style.visibility = "hidden";
+		document.getElementById('endDate').style.visibility = "hidden";		
+	}
+	else {
+		document.getElementById('startDate').style.visibility = "visible";
+		document.getElementById('endDate').style.visibility = "visible";				
+	}
+	document.getElementById('currentLayers').innerHTML = "";
+}
+
+function addLayer(crime) {
+	//Clear all if in heatmap mode
+	//so that only one will be chosen
+	if (document.theForm.mapType[0].checked) {
+		for (key in crimes) {
+			crimes[key] = false;
+		}
+	}
+	
+	crimes[crime] = !crimes[crime];
+	currentLayers = "";
+	if (document.theForm.mapType[1].checked) {
+		for (key in crimes) {
+			if (crimes[key])
+				currentLayers += document.theForm[key].value + "<br/>";
+		}
+	}
+	else {
+		currentLayers = document.theForm[crime].value;
+	}
+		
+	document.getElementById('currentLayers').innerHTML = currentLayers;
+}
+
+function generateMap() {
+	//check that dates are properly formatted if in dotmap mode
+	if (document.theForm.mapType[1].checked) {
+		startDate = document.theForm.startDate.value.replace(/-/g,"");
+		if (!(startDate.match(/[0-9]{8}/) || startDate == "")) {
+			alert("Please input the start date in the proper format.");
+			return;
+		}
+		
+		endDate = document.theForm.endDate.value.replace(/-/g,"");
+		if (!(endDate.match(/[0-9]{8}/) || endDate == "")) {
+			alert("Please input the start date in the proper format.");
+			return;
+		}
+	}
+	
+	for (key in crimes) {
+		if (crimes[key]) {
+			if (document.theForm.mapType[0].checked)
+				heatmap(tables[key]);
+			else
+				dotmap(tables[key], startDate, endDate);
+		}
+	}
+}
+
+</script>
+</head>
+<body onload="initialize()" bgcolor="#2f68ff">
+	<img src="titleBar.jpg">
+  <div id="map_canvas"></div>
+
+
+  <form id="theForm" name="theForm">
+	  <input type="radio" name="mapType" value="heatmap" checked onclick="switchMode('heat')">Heatmap</input>
+	  <input type="radio" name="mapType" value="dotmap" onclick="switchMode('dot')">Dotmap</input>
+	  <input type="button" name="robbery" onclick="addLayer('robbery')" value="Robbery"/>
+	  <input type="button" name="homicide" onclick="addLayer('homicide')" value="Homicide"/>
+	  <input type="button" name="theft" onclick="addLayer('theft')" value="Theft"/>
+	  <input type="button" name="burglary" onclick="addLayer('burglary')" value="Burglary"/>
+	  <input type="button" name="arson" onclick="addLayer('arson')" value="Arson"/>
+	  <input type="button" name="sex" onclick="addLayer('sex')" value="Sex Crimes"/>
+<br>
+	  <input type="button" name="auto" onclick="addLayer('auto')" value="Auto Theft"/>
+	  <input type="button" name="tfa" onclick="addLayer('tfa')" value="Theft from Auto"/>
+	  <input type="button" name="adw" onclick="addLayer('adw')" value="Assault with a Deadly Weapon"/>
+	  <input type="button" name="all" onclick="addLayer('all')" value="All"/><br><br>
+	  <input type="button" value="Generate Map" onclick="generateMap()"/><br>
+	  <input type="button" value="Clear" onclick="removeOverlays()"/>
+	  <div id="startDate">Start Date (YYYYMMDD): <input type="date" name="startDate"/></div>
+	  <div id="endDate">End Date (YYYYMMDD): <input type="date" name="endDate"/></div>
+Attributes:
+	  
+   </form>
+   <div id="currentLayers"></div>
+   	<a href="http://crimemap.dc.gov/"><img src="policeWebsite.jpg"></a>
+	<a href="about.html"><img src="about.jpg"></a>
+</body>
+</html>
